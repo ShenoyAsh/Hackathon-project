@@ -82,18 +82,6 @@ firebase emulators:start
 
 🔑 Add required API keys and Firebase configuration in .env files before running.
 
-👥 Team Members – CodeTrinity
-
-Akshatha – 4SO23CS011
-
-Alisha A Pinto – 4SO23CS016
-
-Ashwini Shenoy B – 4SO23CS042
-
-📧 Team Leader Email: 23a36.ashwini@sjec.ac.in
-
-📞 Team Leader Phone: 7026438371
-
 🌍 Impact & Feasibility
 
 Reduces urban heat by targeting high-impact greening zones
