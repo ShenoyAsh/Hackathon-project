@@ -1,0 +1,100 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isExpert() {
+      return isAuthenticated() && 
+             request.auth.token.role in ['expert', 'authority'];
+    }
+    
+    function isAuthority() {
+      return isAuthenticated() && 
+             request.auth.token.role == 'authority';
+    }
+    
+    function isValidReportData(data) {
+      return data.keys().hasAll(['title', 'description', 'location', 'reportType', 'status']) &&
+             data.title is string &&
+             data.title.size() > 0 &&
+             data.description is string &&
+             data.description.size() > 0 &&
+             data.location is map &&
+             data.reportType in ['unused_space', 'tree_loss', 'heat_hotspot'] &&
+             data.status in ['pending', 'under_review', 'approved', 'rejected', 'implemented'];
+    }
+    
+    // Users collection
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+      allow read: if isExpert();
+    }
+    
+    // Reports collection
+    match /reports/{reportId} {
+      allow create: if isAuthenticated() && isValidReportData(resource.data);
+      allow read: if isAuthenticated();
+      allow update: if isOwner(resource.data.userId) || isExpert();
+      allow delete: if isOwner(resource.data.userId) || isAuthority();
+      
+      // Subcollection for votes
+      match /votes/{voteId} {
+        allow create: if isAuthenticated() && 
+                       request.auth.uid != resource.data.userId &&
+                       resource.data.keys().hasAll(['userId', 'reportId', 'voteType']) &&
+                       resource.data.voteType in ['upvote', 'downvote'];
+        allow read: if isAuthenticated();
+        allow delete: if isOwner(resource.data.userId);
+      }
+      
+      // Subcollection for AI analysis
+      match /analysis/{analysisId} {
+        allow read: if isAuthenticated();
+        allow create: if isExpert();
+        allow update: if isExpert();
+      }
+      
+      // Subcollection for comments
+      match /comments/{commentId} {
+        allow create: if isAuthenticated() && 
+                       resource.data.keys().hasAll(['userId', 'content', 'createdAt']);
+        allow read: if isAuthenticated();
+        allow update: if isOwner(resource.data.userId);
+        allow delete: if isOwner(resource.data.userId) || isAuthority();
+      }
+    }
+    
+    // Voting sessions collection
+    match /votingSessions/{sessionId} {
+      allow create: if isAuthority();
+      allow read: if isAuthenticated();
+      allow update: if isAuthority();
+      allow delete: if isAuthority();
+      
+      // Subcollection for session votes
+      match /votes/{voteId} {
+        allow create: if isAuthenticated() && 
+                       resource.data.keys().hasAll(['userId', 'reportId', 'vote']) &&
+                       resource.data.vote in ['support', 'oppose', 'abstain'];
+        allow read: if isAuthenticated();
+        allow update: if isOwner(resource.data.userId);
+      }
+    }
+    
+    // Impact metrics collection
+    match /impactMetrics/{metricId} {
+      allow read: if isAuthenticated();
+      allow create: if isExpert() || isAuthority();
+      allow update: if isExpert() || isAuthority();
+      allow delete: if isAuthority();
+    }
+  }
+}
